@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: paylink_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: paymo
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - paymo-network
+
+  redis:
+    image: redis:7
+    container_name: paylink_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - paymo-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paylink_backend
+    restart: unless-stopped
+    env_file:
+      - ./.env.docker
+    environment:
+      # DATABASE_URL is explicitly set here to override .env.docker for Docker networking
+      DATABASE_URL: "postgresql://postgres:1234@postgres:5432/paymo"
+      # All other sensitive credentials should be in .env.docker (not committed to git)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "3002:3002"
+    networks:
+      - paymo-network
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: paylink_frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:3002
+      PORT: 3001
+    depends_on:
+      - backend
+    ports:
+      - "3001:3001"
+    networks:
+      - paymo-network
+
+volumes:
+  pg_data:
+  redis_data:
+
+networks:
+  paymo-network:
+    driver: bridge
+

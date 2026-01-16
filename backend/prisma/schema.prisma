@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  products Product[]
+
+  @@map("users")
+}
+
+model Product {
+  id             String  @id @default(cuid())
+  title          String
+  description    String?
+  price          Float
+  quantity       Int?    // null = unlimited
+  soldQuantity   Int     @default(0)
+  imageUrl       String
+  supportEmail   String?
+  supportPhone   String?
+  isAvailable    Boolean @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  merchantId String
+  merchant   User   @relation(fields: [merchantId], references: [id])
+  paymentLinks PaymentLink[]
+
+  @@map("products")
+}
+
+model PaymentLink {
+  id         String   @id @default(cuid())
+  shortCode  String   @unique
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  isActive   Boolean  @default(true)
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  transactions Transaction[]
+
+  @@map("payment_links")
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  paymentLinkId String
+  paymentLink   PaymentLink @relation(fields: [paymentLinkId], references: [id])
+  customerName  String
+  customerEmail String
+  customerPhone String
+  amount        Float
+  reference     String   @unique
+  status        TransactionStatus @default(PENDING)
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  @@map("transactions")
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
